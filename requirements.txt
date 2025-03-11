@@ -1,0 +1,40 @@
+# Framework Web
+fastapi
+uvicorn
+pydantic
+python-dotenv
+python-multipart
+
+# Database
+sqlalchemy
+asyncpg
+alembic
+psycopg2-binary
+sqlalchemy[asyncio]
+
+# Xử lý dữ liệu
+numpy
+pandas
+scikit-learn
+scipy
+
+# Xác thực
+python-jose
+passlib
+bcrypt
+
+# Logging
+loguru
+
+# Background tasks
+apscheduler
+
+# Testing
+pytest
+pytest-asyncio
+httpx
+
+# Các tiện ích khác
+pytz>=2023.3
+python-slugify>=8.0.1
+email-validator>=2.0.0.post2

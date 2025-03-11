@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  recommendation-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PROJECT_NAME=Song Recommendation API
+      - API_SECRET_KEY=${API_SECRET_KEY:-your-secret-key-here}
+      - OTP_EXPIRE_MINUTES=30
+      - CORS_ORIGINS=["*"]
+      - RECO_DB_HOST=postgres
+      - RECO_DB_PORT=5432
+      - RECO_DB_USER=postgres
+      - RECO_DB_PASS=postgres
+      - RECO_DB_NAME=recommendation_service
+      - SYNC_INTERVAL_MINUTES=5
+      - REAL_TIME_SYNC_ENABLED=true
+      - COLLABORATIVE_WEIGHT=0.7
+      - CONTENT_BASED_WEIGHT=0.3
+      - REAL_TIME_BOOST_FACTOR=1.2
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - recommendation-network
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=recommendation_service
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    ports:
+      - "5433:5432"
+    networks:
+      - recommendation-network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - recommendation-network
+
+networks:
+  recommendation-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
