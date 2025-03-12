@@ -6,60 +6,60 @@
   :root {
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
-    
+
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
-    
+
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    
+
     --primary: 262 83.3% 57.8%;
     --primary-foreground: 355.7 100% 97.3%;
-    
+
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
-    
+
     --muted: 240 4.8% 95.9%;
     --muted-foreground: 240 3.8% 46.1%;
-    
+
     --accent: 240 4.8% 95.9%;
     --accent-foreground: 240 5.9% 10%;
-    
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    
+
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
     --ring: 262 83.3% 57.8%;
-    
+
     --radius: 0.5rem;
   }
-  
+
   .dark {
     --background: 225 9% 9%;
     --foreground: 0 0% 98%;
-    
+
     --card: 228 9% 11%;
     --card-foreground: 0 0% 98%;
-    
+
     --popover: 228 9% 11%;
     --popover-foreground: 0 0% 98%;
-    
+
     --primary: 262 83.3% 57.8%;
     --primary-foreground: 355.7 100% 97.3%;
-    
+
     --secondary: 228 6% 16%;
     --secondary-foreground: 0 0% 98%;
-    
+
     --muted: 228 6% 16%;
     --muted-foreground: 240 5% 64.9%;
-    
+
     --accent: 228 6% 16%;
     --accent-foreground: 0 0% 98%;
-    
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    
+
     --border: 228 6% 16%;
     --input: 228 6% 16%;
     --ring: 262 83.3% 57.8%;
@@ -72,6 +72,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
@@ -95,7 +96,7 @@
 
 /* Audio Player Styling */
 .audio-player-wrapper {
-  @apply fixed bottom-0 left-0 right-0 z-50 border-t;
+  @apply fixed bottom-0 left-0 right-0 z-50 border-t bg-background;
 }
 
 /* Music Animation */
@@ -121,4 +122,29 @@
     height: 20px;
     transform: translateY(0);
   }
+}
+
+/* Hide scrollbar in horizontal scroll containers */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+/* Add custom font optimization for Vietnamese text */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: optional;
+  src: url(/fonts/inter-var-viet.woff2) format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+1EA0-1EF9, U+20AB;
+}
+
+
+.vietnamese-optimized {
+  font-feature-settings: "locl" 1;
 }

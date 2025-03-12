@@ -4,11 +4,13 @@ import { User, Song, RecommendationResponse, ModelStats } from '@/lib/types';
 export async function getUsers(params: {
   page?: number;
   size?: number;
+  q?: string;
 } = {}): Promise<{users: User[], total: number}> {
   const searchParams = new URLSearchParams();
-  
+
   if (params.page) searchParams.append('page', params.page.toString());
   if (params.size) searchParams.append('size', params.size.toString());
+  if (params.q) searchParams.append('q', params.q);
   
   return apiClient(`/admin/users?${searchParams.toString()}`);
 }
