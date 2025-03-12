@@ -190,7 +190,6 @@ export interface UserRegistration {
     is_public?: boolean;
   }
   
-  // Admin Types
   export interface ModelStats {
     last_training_time?: string;
     total_users: number;
@@ -210,3 +209,48 @@ export interface UserRegistration {
       coverage?: number;
     };
   }
+
+
+export interface PlaylistBase {
+  title: string;
+  description?: string;
+  is_public?: boolean;
+}
+
+export interface PlaylistCreate extends PlaylistBase {}
+
+export interface PlaylistUpdate {
+  title?: string;
+  description?: string;
+  is_public?: boolean;
+}
+
+export interface Playlist extends PlaylistBase {
+  id: number;
+  user_id: number;
+  song_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlaylistSongBase {
+  playlist_id: number;
+  song_id: number;
+  position: number;
+}
+
+export interface PlaylistSongCreate {
+  song_id: number;
+}
+
+export interface PlaylistSong extends PlaylistSongBase {
+  id: number;
+  added_at: string;
+  song?: Song;
+}
+
+export interface PlaylistWithSongs {
+  playlist: Playlist;
+  songs: Song[];
+  total_songs: number;
+}
