@@ -119,8 +119,6 @@ async def import_spotify_track(
         )
 
     track = schemas.SpotifyTrack(**track_data)
-
-    # Get genre from the first artist if available
     genre = None
     if track.artists and len(track.artists) > 0:
         try:
@@ -129,7 +127,6 @@ async def import_spotify_track(
             if "genres" in artist_data and artist_data["genres"]:
                 genre = artist_data["genres"][0]
         except Exception:
-            # If we can't get genre, just continue without it
             pass
 
     db_song = models.Song(
@@ -180,3 +177,15 @@ async def get_spotify_recommendations(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Spotify API error: {str(e)}"
         )
+
+
+@router.get("/genres", response_model=List[str])
+async def get_genres(
+        db: AsyncSession = Depends(get_db),
+        current_user: models.User = Depends(deps.get_current_active_user)
+) -> Any:
+    stmt = select(func.distinct(models.Song.genre)).where(models.Song.genre.is_not(None))
+    result = await db.execute(stmt)
+    genres = result.scalars().all()
+
+    return {"genres": genres}

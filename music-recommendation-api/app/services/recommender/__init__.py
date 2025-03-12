@@ -31,29 +31,48 @@ class RecommenderService:
         self.training_in_progress = False
 
     async def initialize(self, force_reload: bool = False):
+
         if self.model_initialized and not force_reload:
             return
 
         logger.info("Initializing recommender service")
 
         try:
-            if self.model_trainer.load_ncf_model("ncf_best.pt"):
-                self.model_initialized = True
-                logger.info("Loaded existing recommendation model")
-                return
-        except Exception as e:
-            logger.warning(f"Error loading model: {str(e)}")
+            model_loaded = False
+            try:
+                if self.model_trainer.load_ncf_model("ncf_best.pt"):
+                    model_loaded = True
+                    logger.info("Loaded existing recommendation model")
+            except Exception as e:
+                logger.warning(f"Error loading model: {str(e)}")
 
-        try:
-            await self._load_data()
+            if not model_loaded:
+                await self._load_data()
 
-            asyncio.create_task(self._train_model())
+                if self.data_manager.n_interactions < settings.MIN_INTERACTIONS_FOR_TRAINING:
+                    logger.warning(
+                        f"Not enough interactions for model training. "
+                        f"Need {settings.MIN_INTERACTIONS_FOR_TRAINING}, but got {self.data_manager.n_interactions}."
+                    )
+                    self.model_trainer._init_models(force_reinit=True)
+                    self.model_initialized = True
+                    return
 
-            logger.info("Recommender service initialized with default weights")
+                asyncio.create_task(self._train_model())
+
+            logger.info("Recommender service initialized")
             self.model_initialized = True
+
         except Exception as e:
             logger.error(f"Error initializing recommender service: {str(e)}")
             logger.error(traceback.format_exc())
+            try:
+                self.model_trainer._init_models(force_reinit=True)
+                self.model_initialized = True
+                logger.info("Initialized recommender with default parameters due to error")
+            except Exception as nested_e:
+                logger.critical(f"Critical error initializing models: {str(nested_e)}")
+                raise
 
     async def _load_data(self):
         logger.info("Loading recommender data from database")
