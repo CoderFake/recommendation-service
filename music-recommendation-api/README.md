@@ -91,6 +91,7 @@ docker compose -f docker-compose.yml -f prod.yml up -d
 - `POST /api/v1/songs/spotify/search`: Tìm kiếm bài hát trên Spotify
 - `POST /api/v1/songs/spotify/import`: Import bài hát từ Spotify
 - `GET /api/v1/songs/spotify/recommendations/{song_id}`: Lấy gợi ý từ Spotify cho bài hát
+- `GET /api/v1/songs/genres`: Lấy danh sách thể loại
 
 ### Tương tác người dùng
 
@@ -105,7 +106,71 @@ docker compose -f docker-compose.yml -f prod.yml up -d
 - `GET /api/v1/recommendations`: Lấy danh sách gợi ý cá nhân hóa
 - `GET /api/v1/recommendations/similar/{song_id}`: Tìm bài hát tương tự
 - `GET /api/v1/recommendations/taste-profile`: Xem hồ sơ sở thích âm nhạc của người dùng
-- `POST /api/v1/recommendations/refresh-model`: Làm mới mô hình gợi ý (admin)
+- `POST /api/v1/recommendations/refresh-model`: Làm mới mô hình gợi ý
+
+### Playlist
+
+- `GET /api/v1/playlists`: Lấy tất cả playlist của người dùng
+- `POST /api/v1/playlists`: Tạo playlist mới
+- `GET /api/v1/playlists/{playlist_id}`: Lấy thông tin playlist và danh sách bài hát
+- `PUT /api/v1/playlists/{playlist_id}`: Cập nhật thông tin playlist
+- `DELETE /api/v1/playlists/{playlist_id}`: Xóa playlist
+- `POST /api/v1/playlists/{playlist_id}/songs`: Thêm bài hát vào playlist
+- `DELETE /api/v1/playlists/{playlist_id}/songs/{song_id}`: Xóa bài hát khỏi playlist
+- `PUT /api/v1/playlists/{playlist_id}/songs/{song_id}/position`: Thay đổi vị trí bài hát
+
+### Admin (Cần quyền admin)
+
+- `GET /api/v1/admin/users`: Lấy danh sách người dùng
+- `GET /api/v1/admin/users/{user_id}`: Lấy thông tin người dùng
+- `PUT /api/v1/admin/users/{user_id}/status`: Kích hoạt/vô hiệu hóa người dùng
+- `GET /api/v1/admin/stats`: Lấy thống kê hệ thống
+- `GET /api/v1/admin/model/stats`: Lấy thống kê mô hình
+- `POST /api/v1/admin/model/retrain`: Yêu cầu huấn luyện lại mô hình
+
+
+## Các lỗi thường gặp và cách khắc phục
+
+### Lỗi kết nối database
+
+Nếu gặp lỗi kết nối đến PostgreSQL, hãy kiểm tra:
+
+```bash
+# Kiểm tra container database có chạy không
+docker ps | grep postgres
+
+# Kiểm tra logs của container database
+docker logs music-recommendation-api-postgres-1
+
+# Kết nối trực tiếp vào database để kiểm tra
+docker exec -it music-recommendation-api-postgres-1 psql -U postgres
+```
+
+### Lỗi xác thực Firebase
+
+Nếu gặp lỗi xác thực Firebase, hãy kiểm tra:
+
+1. Thông tin cấu hình Firebase trong file `.env` đã chính xác chưa
+2. Firebase project có bật tính năng Authentication không
+3. Xác nhận rằng bạn đã thêm domain của ứng dụng vào danh sách Authorized Domains trong Firebase Console
+
+### Lỗi API Spotify
+
+Nếu gặp lỗi kết nối đến Spotify API, hãy kiểm tra:
+
+1. Client ID và Client Secret đã chính xác chưa
+2. Token Spotify có hết hạn không (API sẽ tự động refresh token, nhưng đôi khi có thể gặp lỗi)
+
+## Model Huấn luyện và Đánh giá
+
+Để huấn luyện lại mô hình đề xuất:
+
+```bash
+# Sử dụng API endpoint
+curl -X POST http://localhost:22222/api/v1/recommendations/refresh-model -H "Authorization: Bearer YOUR_TOKEN"
+
+# Hoặc truy cập giao diện admin: /admin/model
+```
 
 ## Hệ thống Gợi ý
 
