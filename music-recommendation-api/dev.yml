@@ -3,9 +3,10 @@ version: '3.8'
 services:
   api:
     env_file:
-      - .env.dev
+      - ./.env.dev
     environment:
       - POSTGRES_SERVER=postgres
+      - APP_ENV=dev
     volumes:
       - ./:/app/
       - ./models:/app/models
