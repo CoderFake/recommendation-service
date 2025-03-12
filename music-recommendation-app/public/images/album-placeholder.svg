@@ -1,0 +1,6 @@
+<svg width="300" height="300" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="300" height="300" fill="#4B5563"/>
+  <circle cx="150" cy="150" r="75" fill="#6B7280"/>
+  <path d="M125 190V110L190 150L125 190Z" fill="#E5E7EB"/>
+  <text x="150" y="240" font-family="sans-serif" font-size="24" fill="white" text-anchor="middle">Album Art</text>
+</svg>
