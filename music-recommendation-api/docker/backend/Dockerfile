@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 WORKDIR /app/
 
@@ -11,7 +11,6 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -22,8 +21,14 @@ RUN addgroup --system app && adduser --system --group app \
 
 USER app
 
-COPY docker/backend/docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
-
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["bash", "-c", "\
+    if [ -z \"$APP_ENV\" ]; then \
+        echo \"APP_ENV is not set, defaulting to 'dev'\"; \
+        export APP_ENV=dev; \
+    fi; \
+    echo \"Running in $APP_ENV environment\"; \
+    echo \"Loading configuration from .env.$APP_ENV\"; \
+    echo \"Running database migrations...\"; \
+    alembic upgrade head; \
+    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 \
+"]
