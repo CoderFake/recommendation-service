@@ -18,6 +18,12 @@ export interface UserRegistration {
     updated_at: string;
     is_admin?: boolean; 
   }
+
+  export interface UserUpdate {
+    username?: string;
+    display_name?: string;
+    avatar_url?: string;
+  }
   
   // Song Types
   export interface Song {
