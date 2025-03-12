@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  api:
+    env_file:
+      - .env.stg
+    environment:
+      - POSTGRES_SERVER=postgres
+    volumes:
+      - ./models:/app/models
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
