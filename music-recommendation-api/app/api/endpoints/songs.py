@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import models, schemas
 from app.api import deps
 from app.db.session import get_db
-from app.services.soundcloud import SoundCloudClient
+from app.services.spotify import SpotifyClient
 
 router = APIRouter()
 
@@ -22,7 +22,6 @@ async def search_songs(
         db: AsyncSession = Depends(get_db),
         current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
-
     offset = (page - 1) * size
 
     query = select(models.Song)
@@ -66,7 +65,6 @@ async def get_song(
         db: AsyncSession = Depends(get_db),
         current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
-
     query = select(models.Song).filter(models.Song.id == song_id)
     result = await db.execute(query)
     song = result.scalars().first()
@@ -80,33 +78,31 @@ async def get_song(
     return song
 
 
-@router.post("/soundcloud/search", response_model=List[schemas.SoundCloudTrack])
-async def search_soundcloud(
+@router.post("/spotify/search", response_model=List[schemas.SpotifyTrack])
+async def search_spotify(
         q: str,
         limit: int = Query(10, ge=1, le=50),
-        soundcloud_client: SoundCloudClient = Depends(deps.get_soundcloud_client),
+        spotify_client: SpotifyClient = Depends(deps.get_spotify_client),
         current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
-
     try:
-        tracks = await soundcloud_client.search_tracks(q, limit=limit)
+        tracks = await spotify_client.search_tracks(q, limit=limit)
         return tracks
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"SoundCloud API error: {str(e)}"
+            detail=f"Spotify API error: {str(e)}"
         )
 
 
-@router.post("/soundcloud/import", response_model=schemas.Song)
-async def import_soundcloud_track(
+@router.post("/spotify/import", response_model=schemas.Song)
+async def import_spotify_track(
         track_id: str,
         db: AsyncSession = Depends(get_db),
-        soundcloud_client: SoundCloudClient = Depends(deps.get_soundcloud_client),
+        spotify_client: SpotifyClient = Depends(deps.get_spotify_client),
         current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
-
-    query = select(models.Song).filter(models.Song.soundcloud_id == track_id)
+    query = select(models.Song).filter(models.Song.spotify_id == track_id)
     result = await db.execute(query)
     existing_song = result.scalars().first()
 
@@ -114,27 +110,40 @@ async def import_soundcloud_track(
         return existing_song
 
     try:
-        track_data = await soundcloud_client.get_track(track_id)
+        track_data = await spotify_client.get_track(track_id)
+        audio_features = await spotify_client.get_track_audio_features(track_id)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"SoundCloud API error: {str(e)}"
+            detail=f"Spotify API error: {str(e)}"
         )
 
-    track = schemas.SoundCloudTrack(**track_data)
+    track = schemas.SpotifyTrack(**track_data)
+
+    # Get genre from the first artist if available
+    genre = None
+    if track.artists and len(track.artists) > 0:
+        try:
+            artist_id = track.artists[0].id
+            artist_data = await spotify_client._make_request("get", f"/artists/{artist_id}")
+            if "genres" in artist_data and artist_data["genres"]:
+                genre = artist_data["genres"][0]
+        except Exception:
+            # If we can't get genre, just continue without it
+            pass
 
     db_song = models.Song(
-        soundcloud_id=track.id,
+        spotify_id=track.id,
         title=track.title,
         artist=track.artist,
         artwork_url=track.artwork_url,
-        duration=track.duration,
-        genre=track.genre,
+        duration=track.duration_ms,
+        genre=genre,
         features={
-            "description": track.description,
-            "playback_count": track.playback_count,
-            "likes_count": track.likes_count,
-            "permalink_url": track.permalink_url
+            "popularity": track.popularity,
+            "preview_url": track.preview_url,
+            "explicit": track.explicit,
+            **audio_features
         }
     )
 
@@ -143,3 +152,31 @@ async def import_soundcloud_track(
     await db.refresh(db_song)
 
     return db_song
+
+
+@router.get("/spotify/recommendations/{song_id}", response_model=List[schemas.SpotifyTrack])
+async def get_spotify_recommendations(
+        song_id: int,
+        limit: int = Query(10, ge=1, le=50),
+        db: AsyncSession = Depends(get_db),
+        spotify_client: SpotifyClient = Depends(deps.get_spotify_client),
+        current_user: models.User = Depends(deps.get_current_active_user)
+) -> Any:
+    query = select(models.Song).filter(models.Song.id == song_id)
+    result = await db.execute(query)
+    song = result.scalars().first()
+
+    if not song:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Song not found"
+        )
+
+    try:
+        related_tracks = await spotify_client.get_related_tracks(song.spotify_id, limit=limit)
+        return related_tracks
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Spotify API error: {str(e)}"
+        )

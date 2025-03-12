@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class SongBase(BaseModel):
-    soundcloud_id: str
+    spotify_id: str
     title: str
     artist: str
     artwork_url: Optional[str] = None
@@ -51,28 +51,50 @@ class SongSearchResult(BaseModel):
     size: int
 
 
-class SoundCloudTrack(BaseModel):
+class SpotifyArtist(BaseModel):
     id: str
-    title: str
-    permalink_url: str
-    duration: int
-    user: Dict[str, Any]
-    artwork_url: Optional[str] = None
-    genre: Optional[str] = None
-    description: Optional[str] = None
-    playback_count: Optional[int] = None
-    likes_count: Optional[int] = None
+    name: str
+
+
+class SpotifyAlbum(BaseModel):
+    id: str
+    name: str
+    images: List[Dict[str, Any]]
+
+
+class SpotifyTrack(BaseModel):
+    id: str
+    name: str
+    href: str
+    duration_ms: int
+    popularity: Optional[int] = None
+    album: SpotifyAlbum
+    artists: List[SpotifyArtist]
+    preview_url: Optional[str] = None
+    explicit: bool = False
+
+    @property
+    def title(self) -> str:
+        return self.name
 
     @property
     def artist(self) -> str:
-        return self.user.get("username", "Unknown Artist")
+        if self.artists and len(self.artists) > 0:
+            return self.artists[0].name
+        return "Unknown Artist"
+
+    @property
+    def artwork_url(self) -> Optional[str]:
+        if self.album and self.album.images and len(self.album.images) > 0:
+            return self.album.images[0].get("url")
+        return None
 
     def to_song_create(self) -> SongCreate:
         return SongCreate(
-            soundcloud_id=self.id,
-            title=self.title,
+            spotify_id=self.id,
+            title=self.name,
             artist=self.artist,
             artwork_url=self.artwork_url,
-            duration=self.duration,
-            genre=self.genre,
+            duration=self.duration_ms,
+            genre=None,
         )

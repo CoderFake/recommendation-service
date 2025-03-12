@@ -88,9 +88,10 @@ class Settings(BaseSettings):
     FIREBASE_MESSAGING_SENDER_ID: str = ""
     FIREBASE_APP_ID: str = ""
 
-    # SoundCloud API
-    SOUNDCLOUD_CLIENT_ID: str
-    SOUNDCLOUD_API_BASE_URL: str = "https://api.soundcloud.com"
+    # Spotify API
+    SPOTIFY_CLIENT_ID: str
+    SPOTIFY_CLIENT_SECRET: str
+    SPOTIFY_API_BASE_URL: str = "https://api.spotify.com/v1"
 
     # Recommendation System
     DEFAULT_NUM_RECOMMENDATIONS: int = 10

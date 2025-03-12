@@ -9,7 +9,7 @@ from app.core.security import get_current_user_data
 from app.core.firebase import firebase_client
 from app.db.session import get_db
 from app.models.user import User
-from app.services.soundcloud import SoundCloudClient
+from app.services.spotify import SpotifyClient
 from app.services.recommender import RecommenderService
 
 security = HTTPBearer()
@@ -64,9 +64,9 @@ async def get_firebase_user(
         )
 
 
-async def get_soundcloud_client() -> SoundCloudClient:
-    from app.services.soundcloud import SoundCloudClient
-    return SoundCloudClient()
+async def get_spotify_client() -> SpotifyClient:
+    from app.services.spotify import SpotifyClient
+    return SpotifyClient()
 
 
 async def get_recommender_service(db: AsyncSession = Depends(get_db)) -> RecommenderService:
