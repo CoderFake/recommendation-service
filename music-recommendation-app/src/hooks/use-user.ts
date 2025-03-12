@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { User, UserUpdate } from '@/lib/types';

@@ -1,3 +1,5 @@
+'use client';
+
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Song } from '@/lib/types';
 import { trackInteractionEvent } from '@/lib/api/interactions';
@@ -45,13 +47,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [duration, setDuration] = useState(0);
   const [playlistMode, setPlaylistMode] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
+  const [isClient, setIsClient] = useState(false);
   
   // Refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize audio element and load state from localStorage
+  // Initialize client-side state
   useEffect(() => {
+    setIsClient(true);
+
     // Create audio element
     audioRef.current = new Audio();
     
@@ -62,9 +67,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.addEventListener('ended', handleSongEnd);
     
     // Load saved state from localStorage
-    const savedState = localStorage.getItem(PLAYER_STATE_KEY);
-    if (savedState) {
-      try {
+    try {
+      const savedState = localStorage.getItem(PLAYER_STATE_KEY);
+      if (savedState) {
         const state = JSON.parse(savedState);
         
         if (state.volume !== undefined) {
@@ -79,9 +84,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (state.playlistMode !== undefined) {
           setPlaylistMode(state.playlistMode);
         }
-      } catch (error) {
-        console.error('Error loading player state:', error);
       }
+    } catch (error) {
+      console.error('Error loading player state:', error);
     }
     
     // Cleanup
@@ -99,20 +104,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Save settings to localStorage when they change
+  // Save settings to localStorage when they change (client-side only)
   useEffect(() => {
+    if (!isClient) return;
+    
     const state = {
       volume,
       repeatMode,
       playlistMode
     };
     
-    localStorage.setItem(PLAYER_STATE_KEY, JSON.stringify(state));
-  }, [volume, repeatMode, playlistMode]);
+    try {
+      localStorage.setItem(PLAYER_STATE_KEY, JSON.stringify(state));
+    } catch (error) {
+      console.error('Error saving player state:', error);
+    }
+  }, [volume, repeatMode, playlistMode, isClient]);
 
   // Update audio source when current song changes
   useEffect(() => {
-    if (!audioRef.current || !currentSong) return;
+    if (!isClient || !audioRef.current || !currentSong) return;
     
     // Get audio URL from song - using preview_url if available
     const audioUrl = currentSong.features?.preview_url;
@@ -144,17 +155,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       }).catch(err => console.error('Error tracking play event:', err));
     }
-  }, [currentSong]);
+  }, [currentSong, isPlaying, isClient, playlistMode]);
 
   // Update volume when it changes
   useEffect(() => {
-    if (!audioRef.current) return;
+    if (!isClient || !audioRef.current) return;
     audioRef.current.volume = volume;
-  }, [volume]);
+  }, [volume, isClient]);
 
   // Handle play/pause state changes
   useEffect(() => {
-    if (!audioRef.current || !currentSong) return;
+    if (!isClient || !audioRef.current || !currentSong) return;
     
     if (isPlaying) {
       audioRef.current.play().catch(err => {
@@ -164,7 +175,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } else {
       audioRef.current.pause();
     }
-  }, [isPlaying]);
+  }, [isPlaying, currentSong, isClient]);
 
   // Handler functions
   const handleTimeUpdate = () => {

@@ -1,3 +1,5 @@
+'use client';
+
 import { auth } from '@/lib/firebase';
 import Cookies from 'js-cookie';
 
@@ -15,11 +17,12 @@ export class APIError extends Error {
 
 export async function getAuthToken(): Promise<string | null> {
   try {
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-      return await currentUser.getIdToken(true);
+    // Try to get token from Firebase auth if available
+    if (auth && auth.currentUser) {
+      return await auth.currentUser.getIdToken(true);
     }
 
+    // Fallback to cookie
     const cookieToken = Cookies.get('session');
     if (cookieToken) {
       return cookieToken;
@@ -38,9 +41,9 @@ export async function apiClient<T = any>(
 ): Promise<T> {
   const token = await getAuthToken();
 
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
+    ...(options.headers as Record<string, string>),
   };
 
   if (token) {

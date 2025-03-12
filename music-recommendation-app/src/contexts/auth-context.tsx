@@ -1,9 +1,17 @@
-// Update src/contexts/auth-context.tsx
+'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@/lib/types';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth, googleProvider } from '@/lib/firebase';
+import { 
+  onAuthStateChanged,
+  signOut as firebaseSignOut,
+  User as FirebaseUser,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider
+} from 'firebase/auth';
 import { registerUser, getCurrentUser } from '@/lib/api/auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +23,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>; // New method
   signUp: (email: string, password: string, username: string, displayName?: string) => Promise<void>;
   signOut: () => Promise<void>;
   setUser: (user: User) => void;
@@ -31,12 +40,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setFirebaseUser(firebaseUser);
+    // Skip Firebase auth if we're in a server environment
+    if (!auth) {
+      setIsLoading(false);
+      return () => {};
+    }
 
-      if (firebaseUser) {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      setFirebaseUser(fbUser);
+
+      if (fbUser) {
         try {
-          const token = await firebaseUser.getIdToken();
+          const token = await fbUser.getIdToken();
           Cookies.set('session', token, { expires: 7 });
 
           try {
@@ -59,10 +74,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    if (!auth) {
+      throw new Error('Firebase auth is not initialized');
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -121,7 +144,94 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // New Google Sign-in method
+  const signInWithGoogle = async () => {
+    if (!auth || !googleProvider) {
+      throw new Error('Firebase auth is not initialized');
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      
+      // This gives you a Google Access Token
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const token = await result.user.getIdToken();
+      Cookies.set('session', token, { expires: 7 });
+
+      try {
+        // Try to get user from our API
+        const userData = await getCurrentUser();
+        setUser(userData);
+        
+        toast({
+          title: "Đăng nhập thành công",
+          description: "Chào mừng bạn trở lại!",
+        });
+      } catch (apiError: any) {
+        // User exists in Firebase but not in our database
+        // Create a new user in our database
+        try {
+          const displayName = result.user.displayName || '';
+          const nameParts = displayName.split(' ');
+          const username = (result.user.email?.split('@')[0] || nameParts[0] || 'user') + 
+                           Math.floor(Math.random() * 1000);
+
+          const userData = await registerUser({
+            firebase_uid: result.user.uid,
+            email: result.user.email || '',
+            username: username,
+            display_name: displayName,
+            avatar_url: result.user.photoURL || undefined,
+          });
+
+          setUser(userData);
+          
+          toast({
+            title: "Đăng ký thành công",
+            description: "Tài khoản của bạn đã được tạo thành công",
+          });
+        } catch (regError: any) {
+          setError(regError.message || "Đăng ký thất bại");
+          toast({
+            title: "Lỗi đăng ký",
+            description: regError.message || "Không thể tạo tài khoản. Vui lòng thử lại.",
+            variant: "destructive",
+          });
+
+          await firebaseSignOut(auth);
+          Cookies.remove('session');
+        }
+      }
+    } catch (error: any) {
+      let errorMessage = "Đăng nhập với Google thất bại";
+
+      if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = "Cửa sổ đăng nhập bị đóng. Vui lòng thử lại.";
+      } else if (error.code === 'auth/popup-blocked') {
+        errorMessage = "Cửa sổ pop-up bị chặn. Vui lòng cho phép pop-up và thử lại.";
+      } else {
+        errorMessage = error.message || "Đăng nhập với Google thất bại";
+      }
+
+      setError(errorMessage);
+      toast({
+        title: "Lỗi đăng nhập",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const signUp = async (email: string, password: string, username: string, displayName?: string) => {
+    if (!auth) {
+      throw new Error('Firebase auth is not initialized');
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -190,6 +300,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    if (!auth) {
+      throw new Error('Firebase auth is not initialized');
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -227,6 +341,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         error,
         signIn,
+        signInWithGoogle,
         signUp,
         signOut,
         setUser: updateUserData,

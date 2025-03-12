@@ -1,5 +1,7 @@
+'use client';
+
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getAuth, connectAuthEmulator, GoogleAuthProvider } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
@@ -10,29 +12,38 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
 };
 
-if (!firebaseConfig.apiKey) {
-  console.warn('Missing Firebase API Key. Authentication will not work correctly.');
-}
 
 let app;
 let auth;
+let googleProvider;
 
-try {
-  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  auth = getAuth(app);
-
-  if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
-    try {
-      connectAuthEmulator(auth, 'http://localhost:9099');
-      console.log('Connected to Firebase Auth Emulator');
-    } catch (error) {
-      console.error('Error connecting to Firebase Auth Emulator:', error);
+if (typeof window !== 'undefined') {
+  try {
+    app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    googleProvider = new GoogleAuthProvider();
+    
+    googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+    googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
+    
+    if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
+      try {
+        connectAuthEmulator(auth, 'http://localhost:9099');
+        console.log('Connected to Firebase Auth Emulator');
+      } catch (error) {
+        console.error('Error connecting to Firebase Auth Emulator:', error);
+      }
     }
+  } catch (error) {
+    console.error('Error initializing Firebase:', error);
+    app = null;
+    auth = null;
+    googleProvider = null;
   }
-} catch (error) {
-  console.error('Error initializing Firebase:', error);
+} else {
   app = null;
   auth = null;
+  googleProvider = null;
 }
 
-export { app, auth };
+export { app, auth, googleProvider };
