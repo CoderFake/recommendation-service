@@ -181,6 +181,14 @@ class RecommenderService:
             await self.initialize()
 
         try:
+            stmt = select(func.count()).select_from(models.Interaction).where(models.Interaction.user_id == user_id)
+            result = await self.db.execute(stmt)
+            interaction_count = result.scalar() or 0
+
+            if interaction_count < settings.MIN_INTERACTIONS_FOR_RECOMMENDATIONS:
+                return await self.get_cold_start_recommendations(user_id,
+                                                                 request.limit or settings.DEFAULT_NUM_RECOMMENDATIONS)
+
             limit = request.limit or settings.DEFAULT_NUM_RECOMMENDATIONS
             exclude_items = set(request.seed_songs or [])
             collaborative_weight = request.collaborative_weight or settings.COLLABORATIVE_WEIGHT
@@ -231,6 +239,140 @@ class RecommenderService:
 
         except Exception as e:
             logger.error(f"Error getting recommendations: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise
+
+    async def get_cold_start_recommendations(self, user_id: int, limit: int = 10) -> schemas.RecommendationResponse:
+
+        logger.info(f"Generating cold-start recommendations for user {user_id}")
+
+        try:
+            # Get top songs by popularity
+            stmt = (
+                select(models.Song)
+                .order_by(models.Song.features['popularity'].desc())
+                .limit(limit * 2)  # Fetch more for diversity
+            )
+
+            result = await self.db.execute(stmt)
+            popular_songs = result.scalars().all()
+
+            # Get recent interactions (if any) to find genres
+            user_stmt = (
+                select(models.Interaction)
+                .where(models.Interaction.user_id == user_id)
+                .order_by(models.Interaction.timestamp.desc())
+                .limit(5)
+            )
+
+            user_result = await self.db.execute(user_stmt)
+            user_interactions = user_result.scalars().all()
+
+            # If we have some interactions, try to use them for genre preferences
+            genre_weighted_songs = []
+            if user_interactions:
+                song_ids = [interaction.song_id for interaction in user_interactions]
+
+                # Get genres from these songs
+                songs_stmt = (
+                    select(models.Song)
+                    .where(models.Song.id.in_(song_ids))
+                )
+
+                songs_result = await self.db.execute(songs_stmt)
+                interacted_songs = songs_result.scalars().all()
+
+                genres = []
+                for song in interacted_songs:
+                    if song.genre and song.genre not in genres:
+                        genres.append(song.genre)
+
+                if genres:
+                    # Get songs from these genres but not in the already interacted songs
+                    genre_stmt = (
+                        select(models.Song)
+                        .where(
+                            models.Song.genre.in_(genres),
+                            ~models.Song.id.in_(song_ids)
+                        )
+                        .order_by(models.Song.features['popularity'].desc())
+                        .limit(limit * 2)
+                    )
+
+                    genre_result = await self.db.execute(genre_stmt)
+                    genre_songs = genre_result.scalars().all()
+
+                    # Assign weights based on popularity
+                    for song in genre_songs:
+                        popularity = song.features.get('popularity', 50) if song.features else 50
+                        genre_weighted_songs.append((song, popularity / 100))
+
+            # Combine recommendations from both approaches
+            final_recommendations = []
+
+            # Add genre-based first if available
+            for song, weight in genre_weighted_songs:
+                if len(final_recommendations) >= limit:
+                    break
+
+                final_recommendations.append(
+                    schemas.SongRecommendation(
+                        song=song,
+                        score=weight,
+                        relevance_factors={
+                            "genre_match": weight,
+                            "popularity": song.features.get('popularity', 50) / 100 if song.features else 0.5
+                        }
+                    )
+                )
+
+            # Add popularity-based recommendations to fill remaining slots
+            for song in popular_songs:
+                if len(final_recommendations) >= limit:
+                    break
+
+                # Skip if already added
+                if any(rec.song.id == song.id for rec in final_recommendations):
+                    continue
+
+                popularity = song.features.get('popularity', 50) / 100 if song.features else 0.5
+
+                final_recommendations.append(
+                    schemas.SongRecommendation(
+                        song=song,
+                        score=popularity,
+                        relevance_factors={
+                            "popularity": popularity
+                        }
+                    )
+                )
+
+            # Create explanation
+            if genre_weighted_songs:
+                explanation = f"Since you're new, we're recommending popular songs and songs from genres like {', '.join(genres[:3])} based on your recent activity."
+            else:
+                explanation = "Since you're new, we're recommending some popular songs to help you get started."
+
+            # Create seed info
+            seed_info = {
+                "seed_songs": [],
+                "seed_genres": genres[:3] if genre_weighted_songs else [],
+                "collaborative_weight": 0.0,
+                "content_based_weight": 1.0,
+                "diversity": 0.5,
+                "include_liked": False,
+                "include_listened": False,
+                "is_cold_start": True
+            }
+
+            return schemas.RecommendationResponse(
+                recommendations=final_recommendations,
+                seed_info=seed_info,
+                explanation=explanation
+            )
+
+        except Exception as e:
+            logger.error(f"Error generating cold-start recommendations: {str(e)}")
             logger.error(traceback.format_exc())
             raise
 
@@ -407,7 +549,8 @@ class RecommenderService:
         elif cb_avg > cf_avg * 1.5:
             explanation_parts.append(", we found songs with similar musical features")
         else:
-            explanation_parts.append(", we balanced finding songs that similar users enjoy and songs with similar musical features")
+            explanation_parts.append(
+                ", we balanced finding songs that similar users enjoy and songs with similar musical features")
 
         explanation_parts.append(".")
 

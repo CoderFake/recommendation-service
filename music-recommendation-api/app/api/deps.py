@@ -72,3 +72,8 @@ async def get_spotify_client() -> SpotifyClient:
 async def get_recommender_service(db: AsyncSession = Depends(get_db)) -> RecommenderService:
     from app.services.recommender import RecommenderService
     return RecommenderService(db)
+
+
+async def get_playlist_service(db: AsyncSession = Depends(get_db)) -> "PlaylistService":
+    from app.services.playlist import PlaylistService
+    return PlaylistService(db)
