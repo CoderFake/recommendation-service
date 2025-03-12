@@ -105,7 +105,29 @@ class Settings(BaseSettings):
 
     class Config:
         case_sensitive = True
-        env_file = ".env"
+
+        @classmethod
+        def customise_sources(
+                cls,
+                init_settings,
+                env_settings,
+                file_secret_settings,
+        ):
+            app_env = os.environ.get("APP_ENV", "dev")
+            env_file = f".env.{app_env}"
+
+            print(f"Loading environment from {env_file}")
+
+            return (
+                init_settings,
+                env_settings,
+                file_secret_settings,
+            )
+
+        env_file = ".env.dev"
 
 
+app_env = os.environ.get("APP_ENV", "dev")
+env_file = f".env.{app_env}"
+os.environ["PYDANTIC_ENV_FILE"] = env_file
 settings = Settings()
